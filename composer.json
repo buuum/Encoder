@@ -1,0 +1,32 @@
+{
+    "name": "buuum/encoder",
+    "type": "library",
+    "description": "A simple library to encode and decode data in PHP. Crypt/Decrypt",
+    "homepage": "https://github.com/buuum/Encoder",
+    "keywords": [
+        "encoding",
+        "encode",
+        "decoding",
+        "decode",
+        "crypt",
+        "decrypt"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Alfons Martinez",
+            "email": "alfonsmartinezparra@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Buuum\\Encoder\\": "src/Encoder"
+        }
+    },
+    "require": {
+        "php": ">=5.5.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^6.0"
+    }
+}
