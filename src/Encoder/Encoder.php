@@ -22,8 +22,9 @@ class Encoder
      * Encoder constructor.
      * @param string $key
      * @param string $method
+     * @throws \Exception
      */
-    public function __construct(string $key, $method = 'AES-256-CBC')
+    public function __construct(string $key = '', $method = 'AES-256-CBC')
     {
         $this->key = $key;
         $this->setMethod($method);
@@ -33,10 +34,15 @@ class Encoder
      * @param array $data
      * @param array $head
      * @param boolean $response_hash_fixed
+     * @param string $key
      * @return string
      */
-    public function encode(array $data, array $head = [], $response_hash_fixed = false)
+    public function encode(array $data, array $head = [], $response_hash_fixed = false, string $key = '')
     {
+        if(empty($key)){
+            $key = $this->key;
+        }
+        
         $header = [
             'expires' => 0,
             'delay'   => 0
@@ -55,21 +61,26 @@ class Encoder
         $segments[] = json_encode($header);
         $segments[] = json_encode($data);
 
-        return $this->sign(implode('.', $segments), $response_hash_fixed);
+        return $this->sign(implode('.', $segments), $response_hash_fixed, $key);
     }
 
     /**
      * @param $data
+     * @param string $key
      * @return mixed
      * @throws DelayException
      * @throws ExpiresException
      */
-    public function decode($data)
+    public function decode($data, string $key = '')
     {
+        if(empty($key)){
+            $key = $this->key;
+        }
+
         $encrypted = $this->base64_url_decode($data);
         list($data, $iv) = explode(':', $encrypted);
 
-        $decrypted = openssl_decrypt($data, $this->method, $this->key, 0, $iv);
+        $decrypted = openssl_decrypt($data, $this->method, $key, 0, $iv);
         list($headers, $data) = explode('.', json_decode($decrypted), 2);
         $headers = json_decode($headers, true);
 
@@ -101,23 +112,25 @@ class Encoder
     /**
      * @param $data
      * @param $response_hash_fixed
+     * @param $key
      * @return string
      */
-    private function sign($data, $response_hash_fixed)
+    private function sign($data, $response_hash_fixed, $key)
     {
-        $iv = $this->getIv($response_hash_fixed);
-        $encrypted = openssl_encrypt(json_encode($data), $this->method, $this->key, 0, $iv);
+        $iv = $this->getIv($response_hash_fixed, $key);
+        $encrypted = openssl_encrypt(json_encode($data), $this->method, $key, 0, $iv);
         return $this->base64_url_encode($encrypted . ':' . $iv);
     }
 
     /**
      * @param $response_hash_fixed
+     * @param $key
      * @return string
      */
-    private function getIv($response_hash_fixed)
+    private function getIv($response_hash_fixed, $key)
     {
         $size = openssl_cipher_iv_length($this->method);
-        $key = (!$response_hash_fixed) ? time() : $this->key;
+        $key = (!$response_hash_fixed) ? time() : $key;
 
         return substr(hash('sha256', $key), 0, $size);
     }
