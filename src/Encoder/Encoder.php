@@ -31,6 +31,19 @@ class Encoder
     }
 
     /**
+     * @param $method
+     * @throws \Exception
+     */
+    public function setMethod($method)
+    {
+        if (!in_array($method, openssl_get_cipher_methods())) {
+            throw new \Exception('Method not allowed');
+        }
+
+        $this->method = $method;
+    }
+
+    /**
      * @param array $data
      * @param array $head
      * @param boolean $response_hash_fixed
@@ -39,10 +52,10 @@ class Encoder
      */
     public function encode(array $data, array $head = [], $response_hash_fixed = false, string $key = '')
     {
-        if(empty($key)){
+        if (empty($key)) {
             $key = $this->key;
         }
-        
+
         $header = [
             'expires' => 0,
             'delay'   => 0
@@ -62,51 +75,6 @@ class Encoder
         $segments[] = json_encode($data);
 
         return $this->sign(implode('.', $segments), $response_hash_fixed, $key);
-    }
-
-    /**
-     * @param $data
-     * @param string $key
-     * @return mixed
-     * @throws DelayException
-     * @throws ExpiresException
-     */
-    public function decode($data, string $key = '')
-    {
-        if(empty($key)){
-            $key = $this->key;
-        }
-
-        $encrypted = $this->base64_url_decode($data);
-        list($data, $iv) = explode(':', $encrypted);
-
-        $decrypted = openssl_decrypt($data, $this->method, $key, 0, $iv);
-        list($headers, $data) = explode('.', json_decode($decrypted), 2);
-        $headers = json_decode($headers, true);
-
-        if ($headers['expires'] > 0 && $headers['expires'] < time()) {
-            $time = date(\DateTime::ISO8601, $headers['expires']);
-            throw new ExpiresException('This token expired on ' . $time, $headers['expires']);
-        }
-        if ($headers['delay'] > 0 && $headers['delay'] > time()) {
-            $time = date(\DateTime::ISO8601, $headers['delay']);
-            throw new DelayException('Cannot handle token prior to ' . $time, $headers['delay']);
-        }
-
-        return json_decode($data);
-    }
-
-    /**
-     * @param $method
-     * @throws \Exception
-     */
-    public function setMethod($method)
-    {
-        if (!in_array($method, openssl_get_cipher_methods())) {
-            throw new \Exception('Method not allowed');
-        }
-
-        $this->method = $method;
     }
 
     /**
@@ -144,6 +112,44 @@ class Encoder
     private function base64_url_encode($input)
     {
         return strtr(base64_encode($input), '+/', '-_');
+    }
+
+    /**
+     * @param $data
+     * @param string $key
+     * @return mixed
+     * @throws DelayException
+     * @throws ExpiresException
+     */
+    public function decode($data, string $key = '')
+    {
+        if (empty($key)) {
+            $key = $this->key;
+        }
+
+        $encrypted = $this->base64_url_decode($data);
+        //list($data, $iv) = explode(':', $encrypted);
+        $parts = explode(':', $encrypted);
+        $data = $parts[0];
+        $iv = !empty($parts[1]) ? $parts[1] : '';
+
+        $decrypted = openssl_decrypt($data, $this->method, $key, 0, $iv);
+        //list($headers, $data) = explode('.', json_decode($decrypted), 2);
+        $parts = explode('.', json_decode($decrypted), 2);
+        $headers = $parts[0];
+        $data = !empty($parts[1]) ? $parts[1] : [];
+        $headers = json_decode($headers, true);
+
+        if ($headers['expires'] > 0 && $headers['expires'] < time()) {
+            $time = date(\DateTime::ISO8601, $headers['expires']);
+            throw new ExpiresException('This token expired on ' . $time, $headers['expires']);
+        }
+        if ($headers['delay'] > 0 && $headers['delay'] > time()) {
+            $time = date(\DateTime::ISO8601, $headers['delay']);
+            throw new DelayException('Cannot handle token prior to ' . $time, $headers['delay']);
+        }
+
+        return json_decode($data);
     }
 
     /**
